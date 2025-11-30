@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="tr">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Türkiye'nin Komşuları İpucu Quiz</title>
+  
+  <script>
+    window.dataSdk = {
+        init: async (handler) => {
+            const storedData = localStorage.getItem('quiz_results');
+            const initialData = storedData ? JSON.parse(storedData) : [];
+            handler.onDataChanged(initialData);
+            return { isOk: true };
+        },
+        set: async (data) => {
+            localStorage.setItem('quiz_results', JSON.stringify(data));
+            return { isOk: true };
+        }
+    };
+
+    window.elementSdk = {
+        init: (config) => {
+            if (config.onConfigChange) {
+                config.onConfigChange(config.defaultConfig);
+            }
+        }
+    };
+  </script>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .answer-option {
+            transition: all 0.3s ease;
+            cursor: grab;
+        }
+        
+        .answer-option:active {
+            cursor: grabbing;
+        }
+        
+        .answer-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .drop-zone {
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone.drag-over {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+            transform: scale(1.02);
+        }
+        
+        /* Süre Azalırken Titreme Efekti */
+        .timer-warning {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Harita kaldırıldığı için düzeni basitleştirdim */
+        #quizContent {
+            display: grid;
+            grid-template-columns: 1fr; /* Tek sütun */
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body>
+  <div id="app" style="width: 100%; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem 0;">
+   
+   <div id="loginScreen" style="max-width: 28rem; margin: 0 auto; background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+    <div style="text-align: center; margin-bottom: 2rem;">
+     <h1 style="font-size: 2rem; font-weight: bold; color: #4c1d95; margin-bottom: 0.5rem;">🗺️ Türkiye'nin Komşuları</h1>
+     <p style="color: #6b7280; font-size: 1rem;">Komşu ülkelerimizi öğrenelim!</p>
+    </div>
+    <div style="margin-bottom: 1.5rem;"><label style="display: block; font-weight: 600; color: #374151; margin-bottom: 0.5rem;" for="studentName">Adınız ve Soyadınız</label> <input type="text" id="studentName" placeholder="Örn: Ahmet Yılmaz" style="width: 100%; padding: 0.75rem; border: 2px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem;" required>
+    </div><button id="studentStartBtn" style="width: 100%; background: #7c3aed; color: white; padding: 1rem; border-radius: 0.5rem; font-weight: 600; font-size: 1.125rem; border: none; cursor: pointer; margin-bottom: 1rem;"> Quiz'e Başla 🚀 </button>
+    <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb;"><button id="teacherLoginBtn" style="color: #7c3aed; font-weight: 600; background: none; border: none; cursor: pointer; font-size: 0.875rem;"> 👨‍🏫 Öğretmen Girişi </button>
+    </div>
+   </div>
+   
+   <div id="teacherModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; padding: 1rem;">
+    <div style="max-width: 24rem; margin: 5rem auto; background: white; border-radius: 1rem; padding: 2rem;">
+     <h2 style="font-size: 1.5rem; font-weight: bold; color: #4c1d95; margin-bottom: 1.5rem; text-align: center;">Öğretmen Girişi</h2>
+     <div style="margin-bottom: 1rem;"><label style="display: block; font-weight: 600; color: #374151; margin-bottom: 0.5rem;" for="teacherPassword">Şifre</label> <input type="password" id="teacherPassword" placeholder="Şifrenizi girin" style="width: 100%; padding: 0.75rem; border: 2px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem;">
+     </div>
+     <div id="passwordError" style="display: none; color: #dc2626; font-size: 0.875rem; margin-bottom: 1rem; text-align: center;"></div>
+     <div style="display: flex; gap: 0.75rem;"><button id="teacherLoginSubmit" style="flex: 1; background: #7c3aed; color: white; padding: 0.75rem; border-radius: 0.5rem; font-weight: 600; border: none; cursor: pointer;"> Giriş Yap </button> <button id="teacherModalClose" style="flex: 1; background: #e5e7eb; color: #374151; padding: 0.75rem; border-radius: 0.5rem; font-weight: 600; border: none; cursor: pointer;"> İptal </button>
+     </div>
+    </div>
+   </div>
+   
+   <div id="quizScreen" style="display: none; max-width: 42rem; margin: 0 auto; padding: 0 1rem;">
+    <div style="background: white; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+      <div>
+       <h2 style="font-size: 1.25rem; font-weight: bold; color: #4c1d95; margin-bottom: 0.25rem;">👋 <span id="studentNameDisplay"></span></h2>
+       <p style="color: #6b7280; font-size: 0.875rem;">Soru <span id="currentQuestion">1</span> / 8</p>
+      </div>
+      <div style="display: flex; gap: 1.5rem; align-items: center;">
+       <div style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: bold; color: #7c3aed;" id="timerDisplay">
+         35
+        </div>
+        <div style="font-size: 0.75rem; color: #6b7280;">
+         saniye
+        </div>
+       </div>
+       <div style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="scoreDisplay">
+         0
+        </div>
+        <div style="font-size: 0.75rem; color: #6b7280;">
+         puan
+        </div>
+       </div>
+      </div>
+     </div>
+     
+     <div id="quizContent">
+      <div>
+       <h3 style="font-weight: 600; color: #374151; margin-bottom: 1rem; font-size: 1.125rem;">💡 Hangi Komşu Ülke?</h3>
+       <div style="background: #fef3c7; border-radius: 0.75rem; padding: 1.5rem; border: 2px solid #fbbf24;">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+         <svg id="flagClue" viewbox="0 0 200 150" style="width: 100%; max-width: 250px; height: auto; margin: 0 auto; border: 2px solid #92400e; border-radius: 0.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></svg>
+        </div>
+        <div style="margin-bottom: 0.75rem;"><span style="font-weight: 600; color: #92400e;">🏛️ Başkent:</span> <span id="capitalClue" style="color: #78350f; margin-left: 0.5rem; font-size: 1.125rem;"></span>
+        </div>
+        <div style="margin-bottom: 0.75rem;"><span style="font-weight: 600; color: #92400e;">⚖️ Yönetim:</span> <span id="governmentClue" style="color: #78350f; margin-left: 0.5rem; font-size: 1.125rem;"></span>
+        </div>
+        <div><span style="font-weight: 600; color: #92400e;">💰 Para Birimi:</span> <span id="currencyClue" style="color: #78350f; margin-left: 0.5rem; font-size: 1.125rem;"></span>
+        </div>
+       </div>
+       <div style="margin-top: 1rem; padding: 0.75rem; background: #dbeafe; border-radius: 0.5rem; text-align: center;"><span style="font-weight: 600; color: #1e40af;">Hak: <span id="attemptDisplay">2</span>/2</span> <span style="display: block; font-size: 0.75rem; color: #3b82f6; margin-top: 0.25rem;">1. denemede 10, 2. denemede 5 puan!</span>
+       </div>
+      </div>
+     </div>
+     
+     <div style="margin-bottom: 1.5rem; margin-top: 1.5rem;">
+      <h3 style="font-weight: 600; color: #374151; margin-bottom: 1rem; font-size: 1.125rem;">🎯 Cevabı Buraya Sürükle</h3>
+      <div id="dropZone" class="drop-zone" style="background: #f9fafb; border: 3px dashed #9ca3af; border-radius: 0.75rem; padding: 2rem; text-align: center; min-height: 4rem; display: flex; align-items: center; justify-content: center;"><span style="color: #6b7280; font-size: 1.125rem;">👆 Cevabı buraya sürükleyin</span>
+      </div>
+     </div>
+     
+     <div>
+      <h3 style="font-weight: 600; color: #374151; margin-bottom: 1rem; font-size: 1.125rem;">📋 Şıklar</h3>
+      <div id="answersContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 1rem;">
+       </div>
+     </div>
+    </div>
+   </div>
+   
+   <div id="resultsScreen" style="display: none; max-width: 32rem; margin: 0 auto; background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+    <div style="text-align: center;">
+     <div style="font-size: 4rem; margin-bottom: 1rem;">
+      🎉
+     </div>
+     <h2 style="font-size: 2rem; font-weight: bold; color: #4c1d95; margin-bottom: 0.5rem;">Tebrikler!</h2>
+     <p style="color: #6b7280; margin-bottom: 2rem;">Quiz'i tamamladınız!</p>
+     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 0.75rem; padding: 2rem; margin-bottom: 2rem;">
+      <div style="font-size: 3rem; font-weight: bold; color: white; margin-bottom: 0.5rem;" id="finalScore">
+       0
+      </div>
+      <div style="color: white; font-size: 1.125rem;">
+       Toplam Puan
+      </div>
+     </div>
+     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+      <div style="background: #d1fae5; border-radius: 0.5rem; padding: 1rem;">
+       <div style="font-size: 1.5rem; font-weight: bold; color: #059669;" id="correctCount">
+        0
+       </div>
+       <div style="color: #047857; font-size: 0.875rem;">
+        Doğru
+       </div>
+      </div>
+      <div style="background: #fee2e2; border-radius: 0.5rem; padding: 1rem;">
+       <div style="font-size: 1.5rem; font-weight: bold; color: #dc2626;" id="wrongCount">
+        0
+       </div>
+       <div style="color: #b91c1c; font-size: 0.875rem;">
+        Yanlış
+       </div>
+      </div>
+     </div><button id="restartBtn" style="width: 100%; background: #7c3aed; color: white; padding: 1rem; border-radius: 0.5rem; font-weight: 600; font-size: 1.125rem; border: none; cursor: pointer;"> Tekrar Oyna 🔄 </button>
+    </div>
+   </div>
+   
+   <div id="teacherDashboard" style="display: none; max-width: 72rem; margin: 0 auto; padding: 0 1rem;">
+    <div style="background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+      <h2 style="font-size: 2rem; font-weight: bold; color: #4c1d95;">👨‍🏫 Öğretmen Paneli</h2><button id="teacherLogout" style="background: #e5e7eb; color: #374151; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; border: none; cursor: pointer;"> Çıkış Yap </button>
+     </div>
+     <div id="statsContainer" style="margin-bottom: 2rem;">
+      </div>
+     <h3 style="font-weight: 600; color: #374151; margin-bottom: 1rem; font-size: 1.25rem;">📊 Öğrenci Sonuçları</h3>
+     <div id="resultsTable" style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse;">
+       <thead>
+        <tr style="background: #f3f4f6;">
+         <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #d1d5db;">Öğrenci Adı</th>
+         <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151; border-bottom: 2px solid #d1d5db;">Puan</th>
+         <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151; border-bottom: 2px solid #d1d5db;">Doğru</th>
+         <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151; border-bottom: 2px solid #d1d5db;">Yanlış</th>
+         <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #d1d5db;">Tarih</th>
+         <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151; border-bottom: 2px solid #d1d5db;">Detay</th>
+        </tr>
+       </thead>
+       <tbody id="resultsTableBody">
+        </tbody>
+      </table>
+     </div>
+    </div>
+   </div>
+  </div>
+  
+  <script>
+        const defaultConfig = {
+            app_title: "Türkiye'nin Komşuları",
+            welcome_text: "Komşu ülkelerimizi öğrenelim!"
+        };
+
+        // Quiz soruları ve komşu ülke bilgileri
+        const questions = [
+            {
+                country: "Bulgaristan",
+                capital: "Sofya",
+                government: "Cumhuriyet",
+                currency: "Lev",
+                flagSvg: '<rect width="200" height="50" fill="#fff"/><rect y="50" width="200" height="50" fill="#00966E"/><rect y="100" width="200" height="50" fill="#D62612"/>',
+                options: ["Bulgaristan", "Yunanistan", "Romanya", "Sırbistan"]
+            },
+            {
+                country: "Yunanistan",
+                capital: "Atina",
+                government: "Cumhuriyet",
+                currency: "Euro",
+                flagSvg: '<rect width="200" height="16.67" fill="#0D5EAF"/><rect y="16.67" width="200" height="16.67" fill="#fff"/><rect y="33.34" width="200" height="16.67" fill="#0D5EAF"/><rect y="50.01" width="200" height="16.67" fill="#fff"/><rect y="66.68" width="200" height="16.67" fill="#0D5EAF"/><rect y="83.35" width="200" height="16.67" fill="#fff"/><rect y="100.02" width="200" height="16.67" fill="#0D5EAF"/><rect y="116.69" width="200" height="16.67" fill="#fff"/><rect y="133.36" width="200" height="16.66" fill="#0D5EAF"/><rect width="80" height="83.33" fill="#0D5EAF"/><path d="M40,0 L40,83.33 M0,41.67 L80,41.67" stroke="#fff" stroke-width="13"/>',
+                options: ["Yunanistan", "Bulgaristan", "Arnavutluk", "Makedonya"]
+            },
+            {
+                country: "Gürcistan",
+                capital: "Tiflis",
+                government: "Cumhuriyet",
+                currency: "Lari",
+                flagSvg: '<rect width="200" height="150" fill="#fff"/><rect x="85" width="30" height="150" fill="#FF0000"/><rect y="60" width="200" height="30" fill="#FF0000"/><rect x="15" y="15" width="20" height="20" fill="#FF0000"/><rect x="165" y="15" width="20" height="20" fill="#FF0000"/><rect x="15" y="115" width="20" height="20" fill="#FF0000"/><rect x="165" y="115" width="20" height="20" fill="#FF0000"/>',
+                options: ["Gürcistan", "Ermenistan", "Azerbaycan", "Rusya"]
+            },
+            {
+                country: "Ermenistan",
+                capital: "Erivan",
+                government: "Cumhuriyet",
+                currency: "Dram",
+                flagSvg: '<rect width="200" height="50" fill="#D90012"/><rect y="50" width="200" height="50" fill="#0033A0"/><rect y="100" width="200" height="50" fill="#F2A800"/>',
+                options: ["Ermenistan", "Gürcistan", "İran", "Azerbaycan"]
+            },
+            {
+                country: "İran",
+                capital: "Tahran",
+                government: "İslam Cumhuriyeti",
+                currency: "Riyal",
+                flagSvg: '<rect width="200" height="48" fill="#239F40"/><rect y="48" width="200" height="54" fill="#fff"/><rect y="102" width="200" height="48" fill="#DA0000"/><circle cx="100" cy="75" r="15" fill="none" stroke="#DA0000" stroke-width="3"/><text x="100" y="82" font-size="22" text-anchor="middle" fill="#DA0000" font-weight="bold">☪</text>',
+                options: ["İran", "Irak", "Ermenistan", "Azerbaycan"]
+            },
+            {
+                country: "Irak",
+                capital: "Bağdat",
+                government: "Cumhuriyet",
+                currency: "Dinar",
+                flagSvg: '<rect width="200" height="50" fill="#CE1126"/><rect y="50" width="200" height="50" fill="#fff"/><rect y="100" width="200" height="50" fill="#007A3D"/><text x="100" y="82" font-size="32" text-anchor="middle" fill="#007A3D" font-weight="bold">الله أكبر</text>',
+                options: ["Irak", "Suriye", "İran", "Ürdün"]
+            },
+            {
+                country: "Suriye",
+                capital: "Şam",
+                government: "Cumhuriyet",
+                currency: "Suriye Lirası",
+                flagSvg: '<rect width="200" height="50" fill="#CE1126"/><rect y="50" width="200" height="50" fill="#fff"/><rect y="100" width="200" height="50" fill="#000"/><polygon points="75,75 82,93 63,82 87,82 68,93" fill="#007A3D"/><polygon points="125,75 132,93 113,82 137,82 118,93" fill="#007A3D"/>',
+                options: ["Suriye", "Irak", "Lübnan", "Ürdün"]
+            },
+            {
+                country: "Azerbaycan (Nahçıvan)",
+                capital: "Bakü",
+                government: "Cumhuriyet",
+                currency: "Manat",
+                flagSvg: '<rect width="200" height="50" fill="#00B5E2"/><rect y="50" width="200" height="50" fill="#EF3340"/><rect y="100" width="200" height="50" fill="#00AF66"/><circle cx="90" cy="75" r="23" fill="#fff"/><circle cx="95" cy="75" r="19" fill="#EF3340"/><polygon points="115,62 119,72 130,72 121,79 125,89 115,82 105,89 109,79 100,72 111,72" fill="#fff"/>',
+                options: ["Azerbaycan", "Gürcistan", "Ermenistan", "İran"]
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let remainingAttempts = 2;
+        let timer = 35;
+        let timerInterval;
+        let studentName = "";
+        let correctAnswers = 0;
+        let wrongAnswers = 0;
+        let questionResults = [];
+        let allStudentRecords = [];
+
+        // Data SDK Handler (Simüle Edilmiş)
+        const dataHandler = {
+            async onDataChanged(data) {
+                allStudentRecords = data || [];
+                if (document.getElementById('teacherDashboard').style.display !== 'none') {
+                    renderTeacherDashboard();
+                }
+            }
+        };
+
+        async function initApp() {
+            const result = await window.dataSdk.init(dataHandler);
+            if (!result.isOk) {
+                console.error("Data SDK initialization failed");
+            }
+        }
+
+        // Element SDK implementation (Simüle Edilmiş)
+        function onConfigChange(config) {
+            const title = config.app_title || defaultConfig.app_title;
+            const welcome = config.welcome_text || defaultConfig.welcome_text;
+            
+            const titleElements = document.querySelectorAll('h1');
+            titleElements.forEach(el => {
+                if (el.textContent.includes('🗺️')) {
+                    el.textContent = `🗺️ ${title}`;
+                }
+            });
+            
+            const welcomeElements = document.querySelectorAll('p');
+            welcomeElements.forEach(el => {
+                if (el.textContent.includes('Komşu ülkelerimizi')) {
+                    el.textContent = welcome;
+                }
+            });
+        }
+
+        window.elementSdk.init({
+            defaultConfig,
+            onConfigChange
+        });
+
+        // Start timer
+        function startTimer() {
+            timer = 35;
+            document.getElementById('timerDisplay').textContent = timer;
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timer--;
+                const timerEl = document.getElementById('timerDisplay');
+                timerEl.textContent = timer;
+                
+                if (timer <= 10) {
+                    timerEl.classList.add('timer-warning');
+                    timerEl.style.color = '#dc2626';
+                } else {
+                    timerEl.classList.remove('timer-warning');
+                    timerEl.style.color = '#7c3aed';
+                }
+                
+                if (timer <= 0) {
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+
+        // Handle timeout
+        function handleTimeout() {
+            clearInterval(timerInterval);
+            questionResults.push({
+                question: questions[currentQuestionIndex].country,
+                result: "Zaman Aşımı"
+            });
+            wrongAnswers++;
+            
+            showTimeoutMessage();
+            
+            setTimeout(() => {
+                currentQuestionIndex++;
+                if (currentQuestionIndex < questions.length) {
+                    loadQuestion();
+                } else {
+                    showResults();
+                }
+            }, 2000);
+        }
+
+        function showTimeoutMessage() {
+            const dropZone = document.getElementById('dropZone');
+            dropZone.innerHTML = `
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">⏰</div>
+                    <div style="color: #dc2626; font-weight: 600; font-size: 1.125rem;">Süre Doldu!</div>
+                    <div style="color: #6b7280; margin-top: 0.5rem;">Doğru cevap: ${questions[currentQuestionIndex].country}</div>
+                </div>
+            `;
+            dropZone.style.background = '#fee2e2';
+            dropZone.style.borderColor = '#dc2626';
+            document.querySelectorAll('.answer-option').forEach(el => el.draggable = false);
+        }
+
+        // Load question
+        function loadQuestion() {
+            if (currentQuestionIndex >= questions.length) {
+                showResults();
+                return;
+            }
+
+            const question = questions[currentQuestionIndex];
+            remainingAttempts = 2;
+            
+            document.getElementById('currentQuestion').textContent = currentQuestionIndex + 1;
+            document.getElementById('attemptDisplay').textContent = remainingAttempts;
+            
+            // Set flag SVG and clues
+            document.getElementById('flagClue').innerHTML = question.flagSvg;
+            document.getElementById('capitalClue').textContent = question.capital;
+            document.getElementById('governmentClue').textContent = question.government;
+            document.getElementById('currencyClue').textContent = question.currency;
+            
+            const dropZone = document.getElementById('dropZone');
+            dropZone.innerHTML = '<span style="color: #6b7280; font-size: 1.125rem;">👆 Cevabı buraya sürükleyin</span>';
+            dropZone.style.background = '#f9fafb';
+            dropZone.style.borderColor = '#9ca3af';
+            
+            // Şıkları her seferinde karıştır
+            const shuffled = [...question.options].sort(() => Math.random() - 0.5);
+            const answersContainer = document.getElementById('answersContainer');
+            answersContainer.innerHTML = shuffled.map(option => `
+                <div class="answer-option" draggable="true" data-answer="${option}"
+                     style="background: white; border: 2px solid #d1d5db; border-radius: 0.5rem; padding: 1rem; text-align: center; font-weight: 600; color: #374151; font-size: 1rem;">
+                    ${option}
+                </div>
+            `).join('');
+            
+            setupDragAndDrop();
+            startTimer();
+        }
+
+        // Setup drag and drop
+        function setupDragAndDrop() {
+            const options = document.querySelectorAll('.answer-option');
+            const dropZone = document.getElementById('dropZone');
+            
+            options.forEach(option => {
+                option.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', e.target.dataset.answer);
+                    e.target.style.opacity = '0.5';
+                });
+                
+                option.addEventListener('dragend', (e) => {
+                    e.target.style.opacity = '1';
+                });
+                
+                // Mobile/Click support
+                option.addEventListener('click', (e) => {
+                    const answer = e.target.closest('.answer-option')?.dataset.answer;
+                    if (answer) {
+                        checkAnswer(answer);
+                    }
+                });
+            });
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                
+                const answer = e.dataTransfer.getData('text/plain');
+                checkAnswer(answer);
+            });
+        }
+
+        // Check answer
+        function checkAnswer(answer) {
+            clearInterval(timerInterval);
+            
+            const question = questions[currentQuestionIndex];
+            const dropZone = document.getElementById('dropZone');
+            
+            if (answer === question.country) {
+                const points = remainingAttempts === 2 ? 10 : 5;
+                score += points;
+                correctAnswers++;
+                
+                questionResults.push({
+                    question: question.country,
+                    result: `Doğru (${remainingAttempts}. denemede, +${points} puan)`
+                });
+                
+                document.getElementById('scoreDisplay').textContent = score;
+                
+                dropZone.innerHTML = `
+                    <div style="text-align: center;">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">✅</div>
+                        <div style="color: #059669; font-weight: 600; font-size: 1.125rem;">Doğru! +${points} Puan</div>
+                    </div>
+                `;
+                dropZone.style.background = '#d1fae5';
+                dropZone.style.borderColor = '#059669';
+                
+                document.querySelectorAll('.answer-option').forEach(el => el.draggable = false);
+
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    if (currentQuestionIndex < questions.length) {
+                        loadQuestion();
+                    } else {
+                        showResults();
+                    }
+                }, 2000);
+            } else {
+                remainingAttempts--;
+                document.getElementById('attemptDisplay').textContent = remainingAttempts;
+                
+                if (remainingAttempts > 0) {
+                    dropZone.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="font-size: 3rem; margin-bottom: 0.5rem;">❌</div>
+                            <div style="color: #dc2626; font-weight: 600; font-size: 1.125rem;">Yanlış! ${remainingAttempts} hakkınız kaldı</div>
+                        </div>
+                    `;
+                    dropZone.style.background = '#fee2e2';
+                    dropZone.style.borderColor = '#dc2626';
+                    
+                    startTimer();
+                } else {
+                    wrongAnswers++;
+                    questionResults.push({
+                        question: question.country,
+                        result: `Yanlış (Doğru cevap: ${question.country})`
+                    });
+                    
+                    dropZone.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="font-size: 3rem; margin-bottom: 0.5rem;">❌</div>
+                            <div style="color: #dc2626; font-weight: 600; font-size: 1.125rem;">Hakkınız Bitti!</div>
+                            <div style="color: #6b7280; margin-top: 0.5rem;">Doğru cevap: ${question.country}</div>
+                        </div>
+                    `;
+                    dropZone.style.background = '#fee2e2';
+                    dropZone.style.borderColor = '#dc2626';
+                    
+                    document.querySelectorAll('.answer-option').forEach(el => el.draggable = false);
+                    
+                    setTimeout(() => {
+                        currentQuestionIndex++;
+                        if (currentQuestionIndex < questions.length) {
+                            loadQuestion();
+                        } else {
+                            showResults();
+                        }
+                    }, 2000);
+                }
+            }
+        }
+
+        // Show results
+        async function showResults() {
+            clearInterval(timerInterval);
+
+            document.getElementById('quizScreen').style.display = 'none';
+            document.getElementById('resultsScreen').style.display = 'block';
+
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('correctCount').textContent = correctAnswers;
+            document.getElementById('wrongCount').textContent = wrongAnswers;
+
+            await saveResult();
+        }
+
+        // Save result to Data SDK
+        async function saveResult() {
+            const newRecord = {
+                id: Date.now(), 
+                name: studentName,
+                score: score,
+                correct: correctAnswers,
+                wrong: wrongAnswers,
+                date: new Date().toLocaleDateString('tr-TR', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }),
+                details: questionResults
+            };
+
+            allStudentRecords.push(newRecord);
+            const result = await window.dataSdk.set(allStudentRecords);
+
+            if (!result.isOk) {
+                console.error("Failed to save data:", result.error);
+            }
+        }
+
+        // Restart quiz
+        function restartQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+            correctAnswers = 0;
+            wrongAnswers = 0;
+            questionResults = [];
+            remainingAttempts = 2;
+
+            document.getElementById('scoreDisplay').textContent = score;
+            document.getElementById('quizScreen').style.display = 'none';
+            document.getElementById('resultsScreen').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+
+            document.getElementById('studentName').value = '';
+        }
+
+        // Handle Teacher Login
+        function handleTeacherLogin() {
+            const password = document.getElementById('teacherPassword').value;
+            const errorEl = document.getElementById('passwordError');
+
+            // Şifre: 1234
+            if (password === '1234') { 
+                document.getElementById('teacherModal').style.display = 'none';
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('teacherDashboard').style.display = 'block';
+                renderTeacherDashboard();
+            } else {
+                errorEl.textContent = "Hatalı şifre. Lütfen tekrar deneyin. (İpucu: 1234)";
+                errorEl.style.display = 'block';
+            }
+        }
+
+        // Handle Teacher Logout
+        function handleTeacherLogout() {
+            document.getElementById('teacherDashboard').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('teacherPassword').value = '';
+            document.getElementById('passwordError').style.display = 'none';
+        }
+
+        // Render Teacher Dashboard
+        function renderTeacherDashboard() {
+            const tableBody = document.getElementById('resultsTableBody');
+            const statsContainer = document.getElementById('statsContainer');
+            tableBody.innerHTML = '';
+            statsContainer.innerHTML = '';
+
+            if (allStudentRecords.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" style="padding: 1rem; text-align: center; color: #6b7280;">Henüz sonuç yok.</td></tr>';
+                statsContainer.innerHTML = `<div style="background: #f3f4f6; border-radius: 0.75rem; padding: 1.5rem; text-align: center;"><p style="font-weight: 600; color: #4c1d95;">Hiç öğrenci sonucu bulunamadı.</p></div>`;
+                return;
+            }
+
+            // Calculate statistics
+            const totalScore = allStudentRecords.reduce((sum, record) => sum + record.score, 0);
+            const averageScore = (totalScore / allStudentRecords.length).toFixed(1);
+            const passThreshold = 40; 
+            const passCount = allStudentRecords.filter(record => record.score >= passThreshold).length;
+            const failCount = allStudentRecords.length - passCount;
+
+            statsContainer.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; text-align: center;">
+                    <div style="background: #e0f7fa; border-radius: 0.5rem; padding: 1rem;"><div style="font-size: 1.5rem; font-weight: bold; color: #00bcd4;">${allStudentRecords.length}</div><div style="font-size: 0.875rem; color: #0097a7;">Toplam Öğrenci</div></div>
+                    <div style="background: #e8f5e9; border-radius: 0.5rem; padding: 1rem;"><div style="font-size: 1.5rem; font-weight: bold; color: #4caf50;">${averageScore}</div><div style="font-size: 0.875rem; color: #388e3c;">Ortalama Puan</div></div>
+                    <div style="background: #fff8e1; border-radius: 0.5rem; padding: 1rem;"><div style="font-size: 1.5rem; font-weight: bold; color: #ffeb3b;">${passCount}</div><div style="font-size: 0.875rem; color: #fbc02d;">Geçen Öğrenci</div></div>
+                    <div style="background: #ffebee; border-radius: 0.5rem; padding: 1rem;"><div style="font-size: 1.5rem; font-weight: bold; color: #f44336;">${failCount}</div><div style="font-size: 0.875rem; color: #d32f2f;">Kalan Öğrenci</div></div>
+                </div>
+            `;
+
+            allStudentRecords.sort((a, b) => b.score - a.score);
+
+            allStudentRecords.forEach(record => {
+                const row = tableBody.insertRow();
+                row.style.borderBottom = '1px solid #e5e7eb';
+                row.innerHTML = `
+                    <td style="padding: 1rem; font-weight: 500; color: #374151;">${record.name}</td>
+                    <td style="padding: 1rem; text-align: center; font-weight: bold; color: ${record.score >= passThreshold ? '#059669' : '#dc2626'};">${record.score}</td>
+                    <td style="padding: 1rem; text-align: center; color: #059669;">${record.correct}</td>
+                    <td style="padding: 1rem; text-align: center; color: #dc2626;">${record.wrong}</td>
+                    <td style="padding: 1rem; color: #6b7280; font-size: 0.875rem;">${record.date}</td>
+                    <td style="padding: 1rem; text-align: center;">
+                        <button onclick="showDetails(${record.id})" 
+                                style="background: #7c3aed; color: white; padding: 0.4rem 0.8rem; border-radius: 0.375rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;">
+                            Gör
+                        </button>
+                    </td>
+                `;
+            });
+        }
+
+        // Show details
+        function showDetails(recordId) {
+            const record = allStudentRecords.find(r => r.id === recordId);
+            if (!record) return;
+
+            const detailsText = record.details.map(d => `• ${d.question}: ${d.result}`).join('\n');
+            alert(`
+Öğrenci: ${record.name}
+Toplam Puan: ${record.score} (${record.correct} Doğru / ${record.wrong} Yanlış)
+
+Cevap Detayları:
+${detailsText}`);
+        }
+
+        // --- Event Listeners and Initialization ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            
+            // Student Start Button
+            document.getElementById('studentStartBtn').addEventListener('click', () => {
+                studentName = document.getElementById('studentName').value.trim();
+                if (studentName) {
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('quizScreen').style.display = 'block';
+                    document.getElementById('studentNameDisplay').textContent = studentName;
+                    
+                    questions.sort(() => Math.random() - 0.5); 
+                    loadQuestion();
+                } else {
+                    alert("Lütfen adınızı ve soyadınızı giriniz.");
+                }
+            });
+
+            // Restart Button
+            document.getElementById('restartBtn').addEventListener('click', restartQuiz);
+
+            // Teacher Login Button (Opens Modal)
+            document.getElementById('teacherLoginBtn').addEventListener('click', () => {
+                document.getElementById('teacherModal').style.display = 'block';
+            });
+
+            // Teacher Modal Close Button
+            document.getElementById('teacherModalClose').addEventListener('click', () => {
+                document.getElementById('teacherModal').style.display = 'none';
+                document.getElementById('teacherPassword').value = '';
+                document.getElementById('passwordError').style.display = 'none';
+            });
+
+            // Teacher Login Submit
+            document.getElementById('teacherLoginSubmit').addEventListener('click', handleTeacherLogin);
+            
+            // Teacher Logout
+            document.getElementById('teacherLogout').addEventListener('click', handleTeacherLogout);
+            
+            // Allow pressing Enter for teacher login
+            document.getElementById('teacherPassword').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleTeacherLogin();
+                }
+            });
+
+            window.showDetails = showDetails;
+        });
+    </script>
+ </body>
+</html>
